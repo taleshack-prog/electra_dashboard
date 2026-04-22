@@ -10,6 +10,7 @@ const MENU = [
   { href:'/resgates',   icon:'🆘', label:'Resgates SOS' },
   { href:'/resgatistas',icon:'🚐', label:'Resgatistas' },
   { href:'/financeiro', icon:'💰', label:'Financeiro' },
+  { href:'/planos', icon:'🛡', label:'Planos Seguro' },
   { href:'/notificacoes',icon:'🔔',label:'Notificações' },
   { href:'/analytics',  icon:'📊', label:'Analytics' },
   { href:'/configuracoes',icon:'⚙',label:'Configurações' },
