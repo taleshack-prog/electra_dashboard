@@ -37,6 +37,7 @@ export default function Sidebar() {
     { href: '/planos',        icon: '🛡', label: 'Planos Seguro' },
     { href: '/notificacoes',  icon: '🔔', label: 'Notificações' },
     { href: '/analytics',     icon: '📊', label: 'Analytics' },
+    { href: '/ia',            icon: '🤖', label: 'IA Coordenadora' },
     { href: '/configuracoes', icon: '⚙',  label: 'Configurações' },
   ];
 
