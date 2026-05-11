@@ -38,6 +38,7 @@ export default function Sidebar() {
     { href: '/notificacoes',  icon: '🔔', label: 'Notificações' },
     { href: '/analytics',     icon: '📊', label: 'Analytics' },
     { href: '/ia',            icon: '🤖', label: 'IA Coordenadora' },
+    { href: '/resgatistas-pendentes', icon: '🚐', label: 'Cadastros Pendentes' },
     { href: '/configuracoes', icon: '⚙',  label: 'Configurações' },
   ];
 
