@@ -22,18 +22,22 @@ export async function POST(req) {
     return NextResponse.json({ ok: false, error: error.message });
   }
 
-  await supabase.from('resgatistas').upsert({
-    user_id: data.user.id,
+  const { error: insertError } = await supabase.from('resgatistas').insert({
     nome,
     email,
-    status: 'ativo',
-    disponivel: false,
+    status: 'offline',
+    avaliacao: 5.0,
+    total_resgates: 0,
   });
+
+  if (insertError) {
+    console.error('Erro inserir resgatista:', insertError.message);
+  }
 
   await supabase.from('resgatistas_pendentes')
     .update({ status: 'aprovado' })
     .eq('id', id);
 
   console.log('Resgatista criado:', email, 'senha:', senha);
-  return NextResponse.json({ ok: true, senha, user_id: data.user.id });
+  return NextResponse.json({ ok: true, senha });
 }
