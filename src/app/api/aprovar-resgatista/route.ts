@@ -10,6 +10,8 @@ export async function POST(req) {
   const { id, email, nome } = await req.json();
   const senha = Math.random().toString(36).slice(-8) + 'R1!';
 
+  let userId = null;
+
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     password: senha,
@@ -18,21 +20,29 @@ export async function POST(req) {
   });
 
   if (error) {
-    console.error('Erro criar user:', error.message);
-    return NextResponse.json({ ok: false, error: error.message });
+    if (error.message.includes('already been registered')) {
+      const { data: users } = await supabase.auth.admin.listUsers();
+      const existing = users?.users?.find(u => u.email === email);
+      if (existing) {
+        userId = existing.id;
+        await supabase.auth.admin.updateUserById(userId, { password: senha });
+      } else {
+        return NextResponse.json({ ok: false, error: error.message });
+      }
+    } else {
+      return NextResponse.json({ ok: false, error: error.message });
+    }
+  } else {
+    userId = data.user.id;
   }
 
-  const { error: insertError } = await supabase.from('resgatistas').insert({
+  await supabase.from('resgatistas').insert({
     nome,
     email,
     status: 'offline',
     avaliacao: 5.0,
     total_resgates: 0,
   });
-
-  if (insertError) {
-    console.error('Erro inserir resgatista:', insertError.message);
-  }
 
   await supabase.from('resgatistas_pendentes')
     .update({ status: 'aprovado' })
