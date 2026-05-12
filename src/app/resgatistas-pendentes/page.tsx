@@ -32,7 +32,7 @@ export default function ResgatistasPage() {
     if (data.ok) {
       await supabase.from('resgatistas_pendentes').update({ status: 'aprovado' }).eq('id', r.id);
       fetchPendentes();
-      alert('Resgatista aprovado! Credenciais enviadas por email.');
+      alert('Resgatista aprovado!\nEmail: ' + r.email + '\nSenha: ' + data.senha);
     } else {
       alert('Erro: ' + data.error);
     }
