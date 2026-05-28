@@ -26,7 +26,7 @@ export default function ResgatistasPage() {
     const res = await fetch('/api/aprovar-resgatista', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: r.id, email: r.email, nome: r.nome }),
+      body: JSON.stringify({ id: r.id, email: r.email, nome: r.nome, telefone: r.telefone, veiculo_modelo: r.veiculo_modelo, veiculo_placa: r.veiculo_placa }),
     });
     const data = await res.json();
     if (data.ok) {

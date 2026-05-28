@@ -7,7 +7,7 @@ export async function POST(req) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
-  const { id, email, nome } = await req.json();
+  const { id, email, nome, telefone, veiculo_modelo, veiculo_placa } = await req.json();
   const senha = Math.random().toString(36).slice(-8) + 'R1!';
 
   let userId = null;
@@ -39,6 +39,8 @@ export async function POST(req) {
   await supabase.from('resgatistas').insert({
     nome,
     email,
+    telefone: telefone || null,
+    veiculo: veiculo_modelo ? veiculo_modelo + (veiculo_placa ? ' · ' + veiculo_placa : '') : null,
     status: 'offline',
     avaliacao: 5.0,
     total_resgates: 0,
