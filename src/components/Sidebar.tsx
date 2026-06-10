@@ -40,6 +40,7 @@ export default function Sidebar() {
     { href: '/ia',            icon: '🤖', label: 'IA Coordenadora' },
     { href: '/resgatistas-pendentes', icon: '🚐', label: 'Cadastros Pendentes' },
     { href: '/configuracoes', icon: '⚙',  label: 'Configurações' },
+    { href: '/health', icon: '💚', label: 'Health Monitor' },
   ];
 
   return (
