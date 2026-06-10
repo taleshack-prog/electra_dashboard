@@ -29,7 +29,10 @@ export default function HealthPage() {
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: '#00E5FF', marginBottom: 4 }}>⚡ ELECTRA — Health Monitor</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <a href="/" style={{ background: '#111620', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(238,242,247,0.6)', padding: '6px 12px', borderRadius: 8, fontSize: 13, textDecoration: 'none' }}>← Voltar</a>
+            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: '#00E5FF', margin: 0 }}>⚡ ELECTRA — Health Monitor</h1>
+          </div>
             <p style={{ fontSize: 12, color: 'rgba(238,242,247,0.4)', letterSpacing: 1 }}>HTF · MONITORAMENTO EM TEMPO REAL</p>
             {data && <div style={{ marginTop: 12, fontSize: 18, fontWeight: 700, color: color(data.overall) }}>{overallMsg[data.overall]}</div>}
             {lastCheck && <div style={{ fontSize: 11, color: 'rgba(238,242,247,0.3)', marginTop: 4, fontFamily: 'monospace' }}>Atualizado: {lastCheck.toLocaleTimeString('pt-BR')} · Auto-refresh 30s</div>}
