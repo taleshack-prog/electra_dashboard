@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
+    "@clerk/nextjs": "^5.7.6",
+    "@neondatabase/serverless": "^1.1.0",
     "@supabase/supabase-js": "^2.105.1",
     "@types/recharts": "^1.8.29",
     "lucide-react": "^1.8.0",
