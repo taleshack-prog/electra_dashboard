@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email e senha obrigatórios' }, { status: 400, headers: CORS });
   }
   try {
-    const users = await sql\`SELECT * FROM users WHERE email = \${email}\`;
+    const users = await sql`SELECT * FROM users WHERE email = \${email}`;
     if (users.length === 0) {
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401, headers: CORS });
     }
