@@ -10,7 +10,7 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const stations = await sql`SELECT id, name, address, latitude, longitude, status, "pricePerKwh", "powerKw", type FROM stations ORDER BY name`;
+    const stations = await sql`SELECT id, name, address, city, latitude, longitude, status, "pricePerKwh", "powerKw", "isActive" FROM stations WHERE "isActive" = true ORDER BY name`;
     return NextResponse.json({ stations }, { headers: CORS });
   } catch(e: any) {
     return NextResponse.json({ error: e.message }, { status: 500, headers: CORS });
