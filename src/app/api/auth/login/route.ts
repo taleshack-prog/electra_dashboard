@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(process.env.DATABASE_URL!);
 const JWT_SECRET = process.env.JWT_SECRET || 'electra_secret_2024';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email e senha obrigatórios' }, { status: 400, headers: CORS });
   }
   try {
-    const users = await sql`SELECT * FROM users WHERE email = \${email}`;
+    const users = await sql`SELECT * FROM users WHERE email = ${email}`;
     if (users.length === 0) {
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401, headers: CORS });
     }

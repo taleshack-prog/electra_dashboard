@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(process.env.DATABASE_URL!);
 const JWT_SECRET = process.env.JWT_SECRET || 'electra_secret_2024';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };
 
@@ -17,13 +17,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios: name, email, password' }, { status: 400, headers: CORS });
   }
   try {
-    const existing = await sql`SELECT id FROM users WHERE email = \${email}`;
+    const existing = await sql`SELECT id FROM users WHERE email = ${email}`;
     if (existing.length > 0) {
       return NextResponse.json({ error: 'Email já cadastrado' }, { status: 409, headers: CORS });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const id = crypto.randomUUID();
-    await sql`INSERT INTO users (id, name, email, password, phone, "emailVerified", "createdAt", "updatedAt") VALUES (\${id}, \${name}, \${email}, \${hashedPassword}, \${phone || null}, false, NOW(), NOW())`;
+    await sql`INSERT INTO users (id, name, email, password, phone, "emailVerified", "createdAt", "updatedAt") VALUES (${id}, ${name}, ${email}, ${hashedPassword}, ${phone ?? null}, false, NOW(), NOW())`;
     const token = jwt.sign({ userId: id, email }, JWT_SECRET, { expiresIn: '30d' });
     return NextResponse.json({ ok: true, token, user: { id, name, email, phone } }, { headers: CORS });
   } catch(e: any) {
