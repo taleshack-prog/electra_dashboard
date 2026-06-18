@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import jwt from 'jsonwebtoken';
 
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };
 const sql = neon(process.env.DATABASE_URL);
 const JWT_SECRET = process.env.JWT_SECRET || 'electra_secret_2024';
 
@@ -29,14 +30,11 @@ export async function POST(req) {
   }
 }
 
-export async function GET(req) {
-  const auth = req.headers.get('authorization');
-  if (!auth) return NextResponse.json({ error: 'Token obrigatório' }, { status: 401 });
-
+export async function GET() {
   try {
     const requests = await sql`SELECT * FROM sos_requests ORDER BY "createdAt" DESC LIMIT 20`;
-    return NextResponse.json({ requests });
-  } catch(e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({ requests }, { headers: CORS });
+  } catch(e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500, headers: CORS });
   }
 }
