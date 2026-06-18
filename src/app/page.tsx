@@ -1,151 +1,119 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 
 export default function CommandCenter() {
-  const [hora, setHora]               = useState('');
-  const [estacoes, setEstacoes]       = useState<any[]>([]);
+  const [hora, setHora] = useState('');
+  const [estacoes, setEstacoes] = useState<any[]>([]);
   const [resgatistas, setResgatistas] = useState<any[]>([]);
-  const [resgates, setResgates]       = useState<any[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [resgates, setResgates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const tick = () => setHora(new Date().toLocaleTimeString('pt-BR'));
     tick();
     const i = setInterval(tick, 1000);
     carregarDados();
-    return () => clearInterval(i);
+    const poll = setInterval(carregarDados, 15000);
+    return () => { clearInterval(i); clearInterval(poll); };
   }, []);
 
   const carregarDados = async () => {
-    const [{ data: est }, { data: res }, { data: sos }] = await Promise.all([
-      supabase.from('charging_stations').select('*'),
-      supabase.from('resgatistas').select('*'),
-      supabase.from('rescue_requests').select('*').eq('status', 'aguardando'),
-    ]);
-    if (est) setEstacoes(est);
-    if (res) setResgatistas(res);
-    if (sos) setResgates(sos);
+    try {
+      const [estRes, sosRes, drvRes] = await Promise.all([
+        fetch('/api/estacoes'),
+        fetch('/api/sos', { headers: { 'Authorization': 'Bearer admin' } }),
+        fetch('/api/resgatistas/lista'),
+      ]);
+      const [estData, sosData, drvData] = await Promise.all([estRes.json(), sosRes.json(), drvRes.json()]);
+      if (estData.stations) setEstacoes(estData.stations);
+      if (sosData.requests) setResgates(sosData.requests.filter((r: any) => r.status === 'pending'));
+      if (drvData.drivers) setResgatistas(drvData.drivers);
+    } catch {}
     setLoading(false);
   };
 
-  const estacoesOnline  = estacoes.filter(e => e.status === 'online').length;
-  const resgatistasOnline = resgatistas.filter(r => r.status === 'online').length;
+  const estacoesOnline = estacoes.filter(e => e.status === 'available').length;
+  const resgatistasOnline = resgatistas.filter((r: any) => r.isAvailable).length;
 
   const KPI = [
-    { label:'Estações online',    val: loading ? '...' : `${estacoesOnline}/${estacoes.length}`, delta:`${estacoes.filter(e=>e.status==='manutencao').length} em manutenção`, cor:'#00E5FF', icon:'⚡' },
-    { label:'Resgatistas ativos', val: loading ? '...' : resgatistasOnline.toString(), delta:`${resgatistas.length} total`, cor:'#00FF87', icon:'🚐' },
-    { label:'SOS aguardando',     val: loading ? '...' : resgates.length.toString(), delta:'Em tempo real', cor:'#FF3B5C', icon:'🆘' },
-    { label:'Sessões hoje',       val:'1.284', delta:'+48 última hora', cor:'#FFB800', icon:'🔋' },
+    { label: 'Estações online', val: loading ? '...' : `${estacoesOnline}/${estacoes.length}`, delta: `${estacoes.filter(e => e.status === 'maintenance').length} em manutenção`, cor: '#00E5FF', icon: '⚡' },
+    { label: 'Resgatistas ativos', val: loading ? '...' : resgatistasOnline.toString(), delta: `${resgatistas.length} total`, cor: '#00FF87', icon: '🚐' },
+    { label: 'SOS aguardando', val: loading ? '...' : resgates.length.toString(), delta: 'Em tempo real', cor: '#FF3B5C', icon: '🆘' },
+    { label: 'Sessões hoje', val: '1.284', delta: '+48 última hora', cor: '#FFB800', icon: '🔋' },
   ];
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor:'var(--bg)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0E1A', color: '#EEF2F7', fontFamily: 'sans-serif' }}>
       <Sidebar />
-      <main className="flex-1 ml-60 p-6 overflow-auto">
-        <div className="flex items-center justify-between mb-6">
+      <main style={{ flex: 1, padding: 32, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color:'var(--text)' }}>Command Center</h1>
-            <p className="text-sm mt-1" style={{ color:'var(--text3)' }}>Dados em tempo real — Supabase</p>
+            <p style={{ fontSize: 11, color: 'rgba(238,242,247,0.35)', fontFamily: 'monospace', letterSpacing: 3, marginBottom: 6 }}>COMMAND CENTER</p>
+            <h1 style={{ fontSize: 28, fontWeight: 800 }}>Visão Geral</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
-              style={{ backgroundColor:'rgba(0,255,135,0.1)', border:'1px solid rgba(0,255,135,0.2)', color:'#00FF87' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-              Supabase conectado
-            </div>
-            <span className="font-mono text-sm" style={{ color:'var(--text3)' }}>{hora}</span>
+          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '8px 16px', fontFamily: 'monospace', fontSize: 14, color: '#00E5FF' }}>
+            🟢 Neon · {hora}
           </div>
         </div>
 
-        {/* KPIs reais */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {KPI.map((k,i) => (
-            <div key={i} className="rounded-2xl p-4 border"
-              style={{ backgroundColor:'var(--s2)', borderColor:'var(--border)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-mono tracking-widest" style={{ color:'var(--text3)' }}>{k.label.toUpperCase()}</span>
-                <span className="text-xl">{k.icon}</span>
+        {/* KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+          {KPI.map((k, i) => (
+            <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontSize: 22 }}>{k.icon}</span>
+                <span style={{ fontSize: 11, color: 'rgba(238,242,247,0.35)', fontFamily: 'monospace' }}>{k.label.toUpperCase()}</span>
               </div>
-              <div className="text-3xl font-bold mb-1" style={{ color: k.cor }}>{k.val}</div>
-              <div className="text-xs" style={{ color:'var(--text3)' }}>{k.delta}</div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: k.cor, marginBottom: 4 }}>{k.val}</div>
+              <div style={{ fontSize: 12, color: 'rgba(238,242,247,0.38)' }}>{k.delta}</div>
             </div>
           ))}
         </div>
 
-        {/* Estações reais */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="rounded-2xl border" style={{ backgroundColor:'var(--s2)', borderColor:'var(--border)' }}>
-            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor:'var(--border)' }}>
-              <h2 className="font-bold text-sm" style={{ color:'var(--text)' }}>⚡ Estações — Supabase</h2>
-              <span className="text-xs" style={{ color:'var(--text3)' }}>{estacoes.length} registos</span>
-            </div>
-            <div className="p-2">
-              {loading ? (
-                <p className="text-center py-4 text-sm" style={{ color:'var(--text3)' }}>Carregando...</p>
-              ) : estacoes.slice(0,4).map((e,i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl mb-1"
-                  style={{ backgroundColor:'var(--s3)' }}>
-                  <div className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: e.status==='online'?'#00FF87':'#FF3B5C' }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-xs truncate" style={{ color:'var(--text)' }}>{e.nome}</div>
-                    <div className="text-xs truncate" style={{ color:'var(--text3)' }}>{e.tipo} {e.potencia_kw}kW · {e.conectores_livres}/{e.conectores_total} livres</div>
-                  </div>
-                  <div className="text-xs font-bold flex-shrink-0" style={{ color:'#00FF87' }}>R$ {e.preco_kwh}/kWh</div>
+        {/* Tabelas */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+          {/* Estações */}
+          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 20 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: '#00E5FF' }}>⚡ Estações — Neon</h3>
+            {loading ? <p style={{ color: 'rgba(238,242,247,0.3)', fontSize: 13 }}>Carregando...</p> :
+              estacoes.length === 0 ? <p style={{ color: 'rgba(238,242,247,0.3)', fontSize: 13 }}>0 registos</p> :
+              estacoes.slice(0, 5).map((e, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}>
+                  <span>{e.name}</span>
+                  <span style={{ color: e.status === 'available' ? '#00FF87' : '#FF3B5C' }}>{e.status === 'available' ? '● Livre' : '● Ocupado'}</span>
                 </div>
-              ))}
-            </div>
+              ))
+            }
           </div>
 
-          {/* Resgatistas reais */}
-          <div className="rounded-2xl border" style={{ backgroundColor:'var(--s2)', borderColor:'var(--border)' }}>
-            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor:'var(--border)' }}>
-              <h2 className="font-bold text-sm" style={{ color:'var(--text)' }}>🚐 Resgatistas — Supabase</h2>
-              <span className="text-xs" style={{ color:'var(--text3)' }}>{resgatistas.length} registos</span>
-            </div>
-            <div className="p-2">
-              {loading ? (
-                <p className="text-center py-4 text-sm" style={{ color:'var(--text3)' }}>Carregando...</p>
-              ) : resgatistas.map((r,i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl mb-1"
-                  style={{ backgroundColor:'var(--s3)' }}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{ backgroundColor:'rgba(255,59,92,0.15)', color:'#FF3B5C' }}>
-                    {r.nome.split(' ').map((n:string)=>n[0]).join('').slice(0,2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-xs truncate" style={{ color:'var(--text)' }}>{r.nome}</div>
-                    <div className="text-xs truncate" style={{ color:'var(--text3)' }}>{r.zona} · ★ {r.avaliacao}</div>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: r.status==='online'?'rgba(0,255,135,0.15)':'rgba(255,255,255,0.05)', color: r.status==='online'?'#00FF87':'rgba(240,244,255,0.3)' }}>
-                    {r.status}
-                  </span>
+          {/* SOS Pendentes */}
+          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 20 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: '#FF3B5C' }}>🆘 SOS Pendentes — Neon</h3>
+            {loading ? <p style={{ color: 'rgba(238,242,247,0.3)', fontSize: 13 }}>Carregando...</p> :
+              resgates.length === 0 ? <p style={{ color: 'rgba(238,242,247,0.3)', fontSize: 13 }}>Nenhum SOS pendente ✅</p> :
+              resgates.slice(0, 5).map((r, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}>
+                  <span style={{ color: 'rgba(238,242,247,0.7)' }}>{r.address || 'Localização...'}</span>
+                  <span style={{ color: '#FF3B5C', fontFamily: 'monospace', fontSize: 11 }}>{r.urgencyLevel}</span>
                 </div>
-              ))}
-            </div>
+              ))
+            }
           </div>
         </div>
 
         {/* Alertas */}
-        <div className="rounded-2xl border p-4" style={{ backgroundColor:'var(--s2)', borderColor:'var(--border)' }}>
-          <h2 className="font-bold text-sm mb-3" style={{ color:'var(--text)' }}>⚠ Alertas do Sistema</h2>
-          <div className="grid grid-cols-3 gap-3">
+        <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>⚠ Alertas do Sistema</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
-              { msg:`${estacoes.filter(e=>e.status==='manutencao').length} estações em manutenção`, tipo:'warning', icon:'📍' },
-              { msg:`${resgatistasOnline} resgatistas online agora`, tipo:'info', icon:'🚐' },
-              { msg:`${resgates.length} SOS aguardando resgatista`, tipo: resgates.length>0?'error':'info', icon:'🆘' },
-            ].map((a,i) => (
-              <div key={i} className="flex items-center gap-2 p-3 rounded-xl text-xs"
-                style={{
-                  backgroundColor: a.tipo==='error'?'rgba(255,59,92,0.08)':a.tipo==='warning'?'rgba(255,184,0,0.08)':'rgba(0,229,255,0.08)',
-                  border:`1px solid ${a.tipo==='error'?'rgba(255,59,92,0.2)':a.tipo==='warning'?'rgba(255,184,0,0.2)':'rgba(0,229,255,0.2)'}`,
-                  color: a.tipo==='error'?'var(--red)':a.tipo==='warning'?'var(--amber)':'var(--blue)',
-                }}>
+              { icon: '📍', msg: `${estacoes.filter(e => e.status === 'maintenance').length} estações em manutenção`, cor: '#FFB800' },
+              { icon: '🚐', msg: `${resgatistasOnline} resgatistas online agora`, cor: '#00FF87' },
+              { icon: '🆘', msg: `${resgates.length} SOS aguardando resgatista`, cor: resgates.length > 0 ? '#FF3B5C' : '#00FF87' },
+            ].map((a, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, fontSize: 13 }}>
                 <span>{a.icon}</span>
-                <span>{a.msg}</span>
+                <span style={{ color: a.cor }}>{a.msg}</span>
               </div>
             ))}
           </div>

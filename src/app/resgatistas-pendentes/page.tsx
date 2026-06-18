@@ -1,95 +1,63 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import Sidebar from '@/components/Sidebar';
+import { useState, useEffect } from 'react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-export default function ResgatistasPage() {
-  const [pendentes, setPendentes] = useState([]);
+export default function ResgatistasP() {
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aprovando, setAprovando] = useState<string|null>(null);
 
-  useEffect(() => { fetchPendentes(); }, []);
-
-  const fetchPendentes = async () => {
-    const { data } = await supabase
-      .from('resgatistas_pendentes')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setPendentes(data || []);
-    setLoading(false);
+  const carregar = () => {
+    fetch('/api/resgatistas/lista')
+      .then(r => r.json())
+      .then(d => { if (d.drivers) setDrivers(d.drivers.filter((x: any) => x.status === 'pendente')); setLoading(false); });
   };
 
-  const aprovar = async (r) => {
-    const res = await fetch('/api/aprovar-resgatista', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: r.id, email: r.email, nome: r.nome, telefone: r.telefone, veiculo_modelo: r.veiculo_modelo, veiculo_placa: r.veiculo_placa }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      await supabase.from('resgatistas_pendentes').update({ status: 'aprovado' }).eq('id', r.id);
-      fetchPendentes();
-      alert('Resgatista aprovado!\nEmail: ' + r.email + '\nSenha: ' + data.senha);
-    } else {
-      alert('Erro: ' + data.error);
-    }
-  };
+  useEffect(() => { carregar(); }, []);
 
-  const rejeitar = async (id) => {
-    await supabase.from('resgatistas_pendentes').update({ status: 'rejeitado' }).eq('id', id);
-    fetchPendentes();
-  };
-
-  const badge = (status) => {
-    const colors = { pendente: 'bg-yellow-500', aprovado: 'bg-green-500', rejeitado: 'bg-red-500' };
-    return colors[status] || 'bg-gray-500';
+  const aprovar = async (id: string, email: string) => {
+    setAprovando(id);
+    try {
+      await fetch('/api/resgatistas/aprovar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId: id, email }),
+      });
+      carregar();
+    } catch {}
+    setAprovando(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
-      <h1 className="text-2xl font-bold mb-2">🚐 Cadastros de Resgatistas</h1>
-      <p className="text-gray-400 mb-6">Aprovação de novos resgatistas para a plataforma</p>
-
-      {loading ? <p className="text-gray-400">Carregando...</p> : (
-        <div className="space-y-4">
-          {pendentes.length === 0 && <p className="text-gray-500">Nenhum cadastro pendente.</p>}
-          {pendentes.map(r => (
-            <div key={r.id} className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-lg font-bold">{r.nome}</h2>
-                  <p className="text-gray-400 text-sm">{r.email} · {r.telefone}</p>
-                </div>
-                <span className={"px-3 py-1 rounded-full text-xs font-bold text-white " + badge(r.status)}>
-                  {r.status.toUpperCase()}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-400 mb-4">
-                <span>📋 CPF: {r.cpf || '—'}</span>
-                <span>🪪 CNH: {r.cnh || '—'}</span>
-                <span>🚐 Veículo: {r.veiculo_modelo || '—'}</span>
-                <span>🔢 Placa: {r.veiculo_placa || '—'}</span>
-                <span>📅 {new Date(r.created_at).toLocaleDateString('pt-BR')}</span>
-              </div>
-              {r.status === 'pendente' && (
-                <div className="flex gap-3">
-                  <button onClick={() => aprovar(r)}
-                    className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded-lg transition-colors">
-                    ✅ Aprovar
-                  </button>
-                  <button onClick={() => rejeitar(r.id)}
-                    className="flex-1 bg-red-800 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition-colors">
-                    ✗ Rejeitar
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0E1A', color: '#EEF2F7', fontFamily: 'sans-serif' }}>
+      <Sidebar />
+      <main style={{ flex: 1, padding: 32, overflowY: 'auto' }}>
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ fontSize: 11, color: 'rgba(238,242,247,0.35)', fontFamily: 'monospace', letterSpacing: 3, marginBottom: 6 }}>APROVAÇÃO</p>
+          <h1 style={{ fontSize: 28, fontWeight: 800 }}>⏳ Cadastros Pendentes</h1>
         </div>
-      )}
+        {loading ? <p style={{ color: 'rgba(238,242,247,0.3)' }}>Carregando...</p> :
+        drivers.length === 0 ? (
+          <div style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 40, textAlign: 'center', color: 'rgba(238,242,247,0.3)' }}>
+            ✅ Nenhum cadastro pendente
+          </div>
+        ) : drivers.map((d, i) => (
+          <div key={i} style={{ background: '#111827', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 18, padding: 20, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{d.name}</h3>
+                <p style={{ fontSize: 13, color: 'rgba(238,242,247,0.5)', marginBottom: 2 }}>{d.email} · {d.phone || 'sem telefone'}</p>
+                <p style={{ fontSize: 13, color: 'rgba(238,242,247,0.5)', marginBottom: 2 }}>CPF: {d.cpf || '—'} · CNH: {d.cnh || '—'}</p>
+                <p style={{ fontSize: 13, color: 'rgba(238,242,247,0.5)' }}>Veículo: {d.vehicleModel || '—'} · Placa: {d.vehiclePlate || '—'}</p>
+              </div>
+              <button onClick={() => aprovar(d.id, d.email)} disabled={aprovando === d.id}
+                style={{ padding: '10px 20px', background: '#00FF87', border: 'none', borderRadius: 12, color: '#070B14', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: aprovando === d.id ? 0.7 : 1 }}>
+                {aprovando === d.id ? 'Aprovando...' : '✅ Aprovar'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </main>
     </div>
   );
 }
