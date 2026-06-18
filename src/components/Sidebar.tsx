@@ -2,94 +2,81 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [sosCount, setSosCount] = useState(0);
 
   useEffect(() => {
-    carregarSOS();
-    const channel = supabase
-      .channel('sidebar-sos')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rescue_requests' }, () => {
-        carregarSOS();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const carregar = () => {
+      fetch('/api/sos', { headers: { 'Authorization': 'Bearer admin' } })
+        .then(r => r.json())
+        .then(d => {
+          if (d.requests) setSosCount(d.requests.filter((r: any) => r.status === 'pending').length);
+        }).catch(() => {});
+    };
+    carregar();
+    const interval = setInterval(carregar, 15000);
+    return () => clearInterval(interval);
   }, []);
 
-  const carregarSOS = async () => {
-    const { count } = await supabase
-      .from('rescue_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'aguardando');
-    setSosCount(count ?? 0);
-  };
-
   const MENU = [
-    { href: '/',              icon: '⊞', label: 'Command Center' },
-    { href: '/usuarios',      icon: '👤', label: 'Usuários' },
-    { href: '/estacoes',      icon: '⚡', label: 'Estações' },
-    { href: '/resgates',      icon: '🆘', label: 'Resgates SOS', badge: sosCount },
-    { href: '/resgatistas',   icon: '🚐', label: 'Resgatistas' },
-    { href: '/financeiro',    icon: '💰', label: 'Financeiro' },
-    { href: '/planos',        icon: '🛡', label: 'Planos Seguro' },
-    { href: '/notificacoes',  icon: '🔔', label: 'Notificações' },
-    { href: '/analytics',     icon: '📊', label: 'Analytics' },
-    { href: '/ia',            icon: '🤖', label: 'IA Coordenadora' },
-    { href: '/resgatistas-pendentes', icon: '🚐', label: 'Cadastros Pendentes' },
-    { href: '/configuracoes', icon: '⚙',  label: 'Configurações' },
-    { href: '/health', icon: '💚', label: 'Health Monitor' },
+    { href: '/',                      icon: '⊞', label: 'Command Center' },
+    { href: '/usuarios',              icon: '👤', label: 'Usuários' },
+    { href: '/estacoes',              icon: '⚡', label: 'Estações' },
+    { href: '/resgates',              icon: '🆘', label: 'Resgates SOS', badge: sosCount },
+    { href: '/resgatistas',           icon: '🚐', label: 'Resgatistas' },
+    { href: '/resgatistas-pendentes', icon: '⏳', label: 'Cadastros Pendentes' },
+    { href: '/financeiro',            icon: '💰', label: 'Financeiro' },
+    { href: '/planos',                icon: '🛡', label: 'Planos Seguro' },
+    { href: '/notificacoes',          icon: '🔔', label: 'Notificações' },
+    { href: '/analytics',             icon: '📊', label: 'Analytics' },
+    { href: '/ia',                    icon: '🤖', label: 'IA Coordenadora' },
+    { href: '/configuracoes',         icon: '⚙',  label: 'Configurações' },
+    { href: '/health',                icon: '💚', label: 'Health Monitor' },
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 flex flex-col border-r z-50"
-      style={{ backgroundColor: 'var(--s1)', borderColor: 'var(--border)' }}>
-      <div className="p-6 border-b" style={{ borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
-            style={{ backgroundColor: 'rgba(0,229,255,0.15)', border: '1px solid rgba(0,229,255,0.3)' }}>
-            ⚡
-          </div>
+    <aside style={{ position: 'fixed', left: 0, top: 0, height: '100vh', width: 240, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.07)', background: '#0D1117', zIndex: 50, overflowY: 'auto' }}>
+      {/* Logo */}
+      <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,229,255,0.15)', border: '1px solid rgba(0,229,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⚡</div>
           <div>
-            <div className="font-bold text-sm" style={{ color: 'var(--text)' }}>ELECTRA</div>
-            <div className="text-xs" style={{ color: 'var(--text3)', letterSpacing: '2px' }}>DASHBOARD</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#EEF2F7' }}>ELECTRA</div>
+            <div style={{ fontSize: 10, color: 'rgba(238,242,247,0.35)', letterSpacing: 2 }}>DASHBOARD</div>
           </div>
         </div>
       </div>
-      <nav className="flex-1 p-3 overflow-y-auto">
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
         {MENU.map(item => {
           const active = pathname === item.href;
           return (
-            <Link key={item.href} href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1 transition-all"
-              style={{
-                backgroundColor: active ? 'rgba(0,229,255,0.1)' : 'transparent',
-                border: active ? '1px solid rgba(0,229,255,0.2)' : '1px solid transparent',
-                color: active ? 'var(--blue)' : 'var(--text2)',
-              }}>
-              <span className="text-lg">{item.icon}</span>
-              <span className="text-sm font-medium flex-1">{item.label}</span>
+            <Link key={item.href} href={item.href} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, marginBottom: 2, textDecoration: 'none', transition: 'all 0.15s',
+              background: active ? 'rgba(0,229,255,0.1)' : 'transparent',
+              border: active ? '1px solid rgba(0,229,255,0.2)' : '1px solid transparent',
+              color: active ? '#00E5FF' : 'rgba(238,242,247,0.6)',
+            }}>
+              <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{item.label}</span>
               {item.badge !== undefined && item.badge > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold animate-pulse"
-                  style={{ backgroundColor: 'rgba(255,59,92,0.2)', color: 'var(--red)' }}>
-                  {item.badge}
-                </span>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 20, fontWeight: 700, background: 'rgba(255,59,92,0.2)', color: '#FF3B5C' }}>{item.badge}</span>
               )}
             </Link>
           );
         })}
       </nav>
-      <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-            style={{ backgroundColor: 'rgba(0,229,255,0.15)', color: 'var(--blue)' }}>
-            AD
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium truncate" style={{ color: 'var(--text)' }}>Admin ELECTRA</div>
-            <div className="text-xs truncate" style={{ color: 'var(--text3)' }}>admin@electra.com</div>
+
+      {/* Footer */}
+      <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,229,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#00E5FF', flexShrink: 0 }}>AD</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#EEF2F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin ELECTRA</div>
+            <div style={{ fontSize: 11, color: 'rgba(238,242,247,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>admin@electra.com</div>
           </div>
         </div>
       </div>

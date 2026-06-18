@@ -1,63 +1,78 @@
 import { NextResponse } from 'next/server';
+import { neon } from '@neondatabase/serverless';
+import Anthropic from '@anthropic-ai/sdk';
+
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' };
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: CORS });
+}
 
 export async function GET() {
-  const results = { timestamp: new Date().toISOString(), services: {} };
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const results: any = { timestamp: new Date().toISOString(), services: {} };
 
-  results.services.dashboard = { name: 'Dashboard ELECTRA', status: 'ok', ms: 0 };
+  // Backend
+  results.services.backend = { name: 'Dashboard ELECTRA', status: 'ok', ms: 0 };
 
-  const sbStart = Date.now();
+  // Neon PostgreSQL
   try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/charging_stations?select=id&limit=1', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-      signal: AbortSignal.timeout(5000)
-    });
-    results.services.supabase = { name: 'Supabase (PostgreSQL)', status: r.ok ? 'ok' : 'error', ms: Date.now() - sbStart };
-  } catch(e) {
-    results.services.supabase = { name: 'Supabase (PostgreSQL)', status: 'error', ms: Date.now() - sbStart, error: e.message };
+    const sql = neon(process.env.DATABASE_URL!);
+    const start = Date.now();
+    await sql`SELECT 1`;
+    results.services.database = { name: 'Neon PostgreSQL', status: 'ok', ms: Date.now() - start };
+  } catch(e: any) {
+    results.services.database = { name: 'Neon PostgreSQL', status: 'error', ms: 0, error: e.message };
   }
 
-  const aiStart = Date.now();
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] }),
-      signal: AbortSignal.timeout(6000)
-    });
-    const d = await r.json();
-    results.services.ai = { name: 'Claude API (IA Coordenadora)', status: d.error ? 'error' : 'ok', ms: Date.now() - aiStart, error: d.error?.message };
-  } catch(e) {
-    results.services.ai = { name: 'Claude API (IA Coordenadora)', status: 'error', ms: Date.now() - aiStart, error: e.message };
-  }
-
-  const ocppStart = Date.now();
-  try {
-    const gatewayUrl = process.env.OCPP_GATEWAY_URL;
-    if (gatewayUrl) {
-      const r = await fetch(gatewayUrl + '/ping', { signal: AbortSignal.timeout(5000) });
-      const d = await r.json();
-      results.services.ocpp = { name: 'OCPP Gateway', status: d.status === 'ok' ? 'ok' : 'warning', ms: Date.now() - ocppStart };
-    } else {
-      results.services.ocpp = { name: 'OCPP Gateway', status: 'warning', ms: 0, error: 'URL não configurada — deploy Railway pendente' };
+  // Claude API
+  if (process.env.ANTHROPIC_API_KEY) {
+    const start = Date.now();
+    try {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      await anthropic.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] });
+      results.services.ai = { name: 'Claude API (IA Coordenadora)', status: 'ok', ms: Date.now() - start };
+    } catch(e: any) {
+      results.services.ai = { name: 'Claude API (IA Coordenadora)', status: 'error', ms: Date.now() - start, error: e.message };
     }
-  } catch(e) {
-    results.services.ocpp = { name: 'OCPP Gateway', status: 'warning', ms: Date.now() - ocppStart, error: 'Gateway offline' };
   }
 
+  // PWA User
   try {
-    const [usersR, stationsR, rescuesR] = await Promise.all([
-      fetch(SUPABASE_URL + '/rest/v1/profiles?select=id', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'count=exact', 'Range': '0-0' } }),
-      fetch(SUPABASE_URL + '/rest/v1/charging_stations?select=id', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'count=exact', 'Range': '0-0' } }),
-      fetch(SUPABASE_URL + '/rest/v1/rescue_requests?select=id', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'count=exact', 'Range': '0-0' } }),
-    ]);
-    const parseCount = r => { const cr = r.headers.get('content-range'); return cr ? parseInt(cr.split('/')[1]) : 0; };
-    results.stats = { usuarios: parseCount(usersR), estacoes: parseCount(stationsR), resgates: parseCount(rescuesR) };
-  } catch {}
+    const start = Date.now();
+    const r = await fetch('https://electra-pwa-user-6hhb.vercel.app/manifest.json', { signal: AbortSignal.timeout(5000) });
+    results.services.pwa_user = { name: 'PWA Usuário', status: r.ok ? 'ok' : 'warning', ms: Date.now() - start };
+  } catch(e: any) {
+    results.services.pwa_user = { name: 'PWA Usuário', status: 'error', ms: 0, error: e.message };
+  }
 
-  const statuses = Object.values(results.services).map(s => s.status);
+  // PWA Rescue
+  try {
+    const start = Date.now();
+    const r = await fetch('https://electra-app-rescue.vercel.app/manifest.json', { signal: AbortSignal.timeout(5000) });
+    results.services.pwa_rescue = { name: 'PWA Rescue', status: r.ok ? 'ok' : 'warning', ms: Date.now() - start };
+  } catch(e: any) {
+    results.services.pwa_rescue = { name: 'PWA Rescue', status: 'error', ms: 0, error: e.message };
+  }
+
+  const statuses = Object.values(results.services).map((s: any) => s.status);
   results.overall = statuses.includes('error') ? 'degraded' : statuses.includes('warning') ? 'warning' : 'healthy';
 
-  return NextResponse.json(results);
+  // Stats do Neon
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const [users, stations, sos, drivers] = await Promise.all([
+      sql`SELECT COUNT(*) FROM users`,
+      sql`SELECT COUNT(*) FROM stations`,
+      sql`SELECT COUNT(*) FROM sos_requests`,
+      sql`SELECT COUNT(*) FROM sos_drivers`,
+    ]);
+    results.stats = {
+      usuarios: +users[0].count,
+      estacoes: +stations[0].count,
+      resgates: +sos[0].count,
+      resgatistas: +drivers[0].count,
+    };
+  } catch {}
+
+  return NextResponse.json(results, { headers: CORS });
 }

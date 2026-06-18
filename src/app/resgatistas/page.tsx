@@ -15,7 +15,7 @@ export default function Resgatistas() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0A0E1A', color: '#EEF2F7', fontFamily: 'sans-serif' }}>
       <Sidebar />
-      <main style={{ flex: 1, padding: 32, overflowY: 'auto' }}>
+      <main style={{ marginLeft: 240, flex: 1, padding: 32, overflowY: 'auto' }}>
         <div style={{ marginBottom: 28 }}>
           <p style={{ fontSize: 11, color: 'rgba(238,242,247,0.35)', fontFamily: 'monospace', letterSpacing: 3, marginBottom: 6 }}>GESTÃO</p>
           <h1 style={{ fontSize: 28, fontWeight: 800 }}>🚐 Resgatistas</h1>
