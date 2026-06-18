@@ -18,11 +18,15 @@ export default function ResgatistasP() {
   const aprovar = async (id: string, email: string) => {
     setAprovando(id);
     try {
-      await fetch('/api/resgatistas/aprovar', {
+      const r = await fetch('/api/resgatistas/aprovar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ driverId: id, email }),
       });
+      const data = await r.json();
+      if (data.senhaProvisoria) {
+        alert('✅ Resgatista aprovado!\n\nEmail: ' + email + '\nSenha provisória: ' + data.senhaProvisoria + '\n\nGuarda esta senha e envia ao resgatista.');
+      }
       carregar();
     } catch {}
     setAprovando(null);
