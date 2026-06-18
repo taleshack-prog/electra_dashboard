@@ -1,22 +1,10 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 
-interface Estacao {
-  id: string;
-  nome: string;
-  endereco: string;
-  tipo: string;
-  potencia_kw: number;
-  preco_kwh: number;
-  conectores_total: number;
-  conectores_livres: number;
-  status: string;
-}
-
-const statusCor = (s: string) => s==='online'?'#00FF87':s==='manutencao'?'#FF3B5C':'#FFB800';
-const statusLabel = (s: string) => s==='online'?'Online':s==='manutencao'?'Manutenção':'Ocupado';
+interface Estacao { id:string; name:string; address:string; city:string; powerKw:number; pricePerKwh:number; status:string; }
+const statusCor = (s:string) => s==='available'?'#00FF87':s==='maintenance'?'#FF3B5C':'#FFB800';
+const statusLabel = (s:string) => s==='available'?'Disponível':s==='maintenance'?'Manutenção':'Ocupado';
 
 export default function Estacoes() {
   const [estacoes, setEstacoes] = useState<Estacao[]>([]);
@@ -24,83 +12,63 @@ export default function Estacoes() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregarEstacoes();
+    fetch('/api/estacoes').then(r=>r.json()).then(d=>{ if(d.stations) setEstacoes(d.stations); setLoading(false); });
   }, []);
 
-  const carregarEstacoes = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('charging_stations').select('*').order('nome');
-    if (data) setEstacoes(data);
-    setLoading(false);
-  };
-
-  const filtradas = estacoes.filter(e => e.nome.toLowerCase().includes(busca.toLowerCase()));
+  const filtradas = estacoes.filter(e =>
+    e.name?.toLowerCase().includes(busca.toLowerCase()) ||
+    e.address?.toLowerCase().includes(busca.toLowerCase()) ||
+    e.city?.toLowerCase().includes(busca.toLowerCase())
+  );
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor:'var(--bg)' }}>
+    <div style={{display:'flex',minHeight:'100vh',background:'#0A0E1A',color:'#EEF2F7',fontFamily:'sans-serif'}}>
       <Sidebar />
-      <main className="flex-1 ml-60 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <main style={{marginLeft:240,flex:1,padding:32,overflowY:'auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:28}}>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color:'var(--text)' }}>Estações</h1>
-            <p className="text-sm mt-1" style={{ color:'var(--text3)' }}>
-              {loading ? 'Carregando...' : `${estacoes.filter(e=>e.status==='online').length} online · ${estacoes.length} total`}
-            </p>
+            <p style={{fontSize:11,color:'rgba(238,242,247,0.35)',fontFamily:'monospace',letterSpacing:3,marginBottom:6}}>GESTÃO</p>
+            <h1 style={{fontSize:28,fontWeight:800}}>⚡ Estações</h1>
           </div>
-          <div className="flex gap-3">
-            <button onClick={carregarEstacoes} className="px-4 py-2 rounded-xl text-sm"
-              style={{ backgroundColor:'var(--s3)', color:'var(--text2)' }}>↻ Atualizar</button>
-            <button className="px-4 py-2 rounded-xl text-sm font-bold"
-              style={{ backgroundColor:'var(--blue)', color:'#000' }}>+ Nova estação</button>
-          </div>
+          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar estação..."
+            style={{padding:'10px 16px',background:'#111827',border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,color:'#EEF2F7',fontSize:13,outline:'none',width:220}} />
         </div>
-
-        <input value={busca} onChange={e=>setBusca(e.target.value)}
-          placeholder="Buscar estação..." className="w-full px-4 py-2 rounded-xl text-sm outline-none mb-4"
-          style={{ backgroundColor:'var(--s2)', border:'1px solid var(--border)', color:'var(--text)' }} />
-
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="text-4xl mb-4">⚡</div>
-              <p style={{ color:'var(--text3)' }}>Carregando estações...</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:24}}>
+          {[['⚡','Total',estacoes.length,'#00E5FF'],['🟢','Disponíveis',estacoes.filter(e=>e.status==='available').length,'#00FF87'],['🟡','Ocupadas',estacoes.filter(e=>e.status==='occupied').length,'#FFB800'],['🔴','Manutenção',estacoes.filter(e=>e.status==='maintenance').length,'#FF3B5C']].map(([icon,label,val,cor])=>(
+            <div key={label as string} style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:14,padding:16}}>
+              <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
+              <div style={{fontSize:24,fontWeight:800,color:cor as string}}>{val as number}</div>
+              <div style={{fontSize:11,color:'rgba(238,242,247,0.4)',marginTop:2}}>{label as string}</div>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {filtradas.map(e => (
-              <div key={e.id} className="rounded-2xl border p-4" style={{ backgroundColor:'var(--s2)', borderColor:'var(--border)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-mono" style={{ color:'var(--text3)' }}>⚡ ELECTRA</span>
-                  <span className="text-xs px-2 py-1 rounded-full"
-                    style={{ backgroundColor: statusCor(e.status)+'22', color: statusCor(e.status) }}>
-                    {statusLabel(e.status)}
-                  </span>
-                </div>
-                <h3 className="font-bold mb-1" style={{ color:'var(--text)' }}>{e.nome}</h3>
-                <p className="text-xs mb-3" style={{ color:'var(--text3)' }}>📍 {e.endereco}</p>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {[
-                    { label:'Tipo', val:`${e.tipo} ${e.potencia_kw}kW` },
-                    { label:'Livres', val:`${e.conectores_livres}/${e.conectores_total}` },
-                    { label:'Preço', val:`R$ ${e.preco_kwh.toFixed(2)}/kWh` },
-                  ].map((s,i) => (
-                    <div key={i} className="rounded-xl p-2 text-center" style={{ backgroundColor:'var(--s3)' }}>
-                      <div className="text-xs font-bold" style={{ color:'var(--text)' }}>{s.val}</div>
-                      <div className="text-xs" style={{ color:'var(--text3)' }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <button className="flex-1 py-1.5 rounded-xl text-xs font-bold"
-                    style={{ backgroundColor:'rgba(0,229,255,0.1)', color:'var(--blue)' }}>Detalhes</button>
-                  <button className="flex-1 py-1.5 rounded-xl text-xs font-bold"
-                    style={{ backgroundColor:'rgba(255,184,0,0.1)', color:'var(--amber)' }}>Editar</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
+        <div style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,overflow:'hidden'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'rgba(255,255,255,0.03)'}}>
+                {['Nome','Endereço','Cidade','Potência','Preço/kWh','Status'].map(h=>(
+                  <th key={h} style={{padding:'14px 16px',textAlign:'left',fontSize:11,color:'rgba(238,242,247,0.4)',fontFamily:'monospace',letterSpacing:1,fontWeight:500}}>{h.toUpperCase()}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr><td colSpan={6} style={{padding:24,textAlign:'center',color:'rgba(238,242,247,0.3)'}}>Carregando...</td></tr>
+              : filtradas.length===0 ? <tr><td colSpan={6} style={{padding:24,textAlign:'center',color:'rgba(238,242,247,0.3)'}}>Nenhuma estação encontrada</td></tr>
+              : filtradas.map((e,i)=>(
+                <tr key={i} style={{borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+                  <td style={{padding:'12px 16px',fontSize:14,fontWeight:600}}>{e.name}</td>
+                  <td style={{padding:'12px 16px',fontSize:13,color:'rgba(238,242,247,0.5)'}}>{e.address}</td>
+                  <td style={{padding:'12px 16px',fontSize:13,color:'rgba(238,242,247,0.5)'}}>{e.city}</td>
+                  <td style={{padding:'12px 16px',fontSize:13,color:'#00E5FF',fontFamily:'monospace'}}>{e.powerKw}kW</td>
+                  <td style={{padding:'12px 16px',fontSize:13,color:'#00FF87',fontFamily:'monospace'}}>R${e.pricePerKwh}/kWh</td>
+                  <td style={{padding:'12px 16px'}}>
+                    <span style={{background:statusCor(e.status)+'22',color:statusCor(e.status),fontSize:11,padding:'3px 10px',borderRadius:20,fontFamily:'monospace'}}>{statusLabel(e.status)}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
     </div>
   );

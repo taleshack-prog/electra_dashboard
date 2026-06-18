@@ -1,163 +1,110 @@
 'use client';
 import Sidebar from '@/components/Sidebar';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+
+function MetricBar({val,max,cor}:{val:number;max:number;cor:string}) {
+  return (
+    <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:3,overflow:'hidden',marginTop:6}}>
+      <div style={{width:`${max>0?Math.round(val/max*100):0}%`,height:'100%',background:cor,borderRadius:3,transition:'width 0.5s'}} />
+    </div>
+  );
+}
 
 export default function Analytics() {
-  const [estacoes,    setEstacoes]    = useState<any[]>([]);
-  const [resgates,    setResgates]    = useState<any[]>([]);
+  const [estacoes, setEstacoes] = useState<any[]>([]);
+  const [resgates, setResgates] = useState<any[]>([]);
   const [resgatistas, setResgatistas] = useState<any[]>([]);
-  const [loading,     setLoading]     = useState(true);
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { carregarDados(); }, []);
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/estacoes').then(r=>r.json()),
+      fetch('/api/sos').then(r=>r.json()),
+      fetch('/api/resgatistas/lista').then(r=>r.json()),
+      fetch('/api/usuarios').then(r=>r.json()),
+    ]).then(([est,sos,drv,usr])=>{
+      if(est.stations) setEstacoes(est.stations);
+      if(sos.requests) setResgates(sos.requests);
+      if(drv.drivers) setResgatistas(drv.drivers);
+      if(usr.users) setUsuarios(usr.users);
+      setLoading(false);
+    });
+  }, []);
 
-  const carregarDados = async () => {
-    const [{ data: e }, { data: r }, { data: rs }] = await Promise.all([
-      supabase.from('charging_stations').select('*'),
-      supabase.from('rescue_requests').select('*').order('created_at', { ascending: false }),
-      supabase.from('resgatistas').select('*'),
-    ]);
-    if (e)  setEstacoes(e);
-    if (r)  setResgates(r);
-    if (rs) setResgatistas(rs);
-    setLoading(false);
-  };
-
-  // Métricas reais calculadas
-  const estacoesOnline    = estacoes.filter(e => e.status === 'online').length;
-  const estacaoManutencao = estacoes.filter(e => e.status === 'manutencao').length;
-  const taxaDisponib      = estacoes.length ? Math.round((estacoesOnline / estacoes.length) * 100) : 0;
-  const resgatistasOnline = resgatistas.filter(r => r.status === 'online').length;
-  const taxaCobertura     = resgatistas.length ? Math.round((resgatistasOnline / resgatistas.length) * 100) : 0;
-  const sosAguardando     = resgates.filter(r => r.status === 'aguardando').length;
-  const sosConcluidos     = resgates.filter(r => r.status === 'concluido').length;
-  const taxaResolucao     = resgates.length ? Math.round((sosConcluidos / resgates.length) * 100) : 0;
-  const receitaTotal      = resgates.filter(r => r.status === 'concluido').reduce((a, r) => a + (r.valor || 0), 0);
-  const ticketMedio       = sosConcluidos ? (receitaTotal / sosConcluidos) : 0;
-
-  // Top estações por conectores livres
-  const topEstacoes = [...estacoes].sort((a, b) => (b.conectores_livres || 0) - (a.conectores_livres || 0)).slice(0, 5);
-  const maxLivres   = topEstacoes[0]?.conectores_livres || 1;
-
-  // Top resgatistas por avaliação
-  const topResgatistas = [...resgatistas].sort((a, b) => (b.avaliacao || 0) - (a.avaliacao || 0)).slice(0, 5);
-
-  // Distribuição de status dos resgates
-  const statusDist = [
-    { label: 'Aguardando', val: sosAguardando,  cor: '#FF3B5C' },
-    { label: 'Aceito',     val: resgates.filter(r => r.status === 'aceito').length, cor: '#FFB800' },
-    { label: 'Concluído',  val: sosConcluidos,  cor: '#00FF87' },
-    { label: 'Cancelado',  val: resgates.filter(r => r.status === 'cancelado').length, cor: 'rgba(240,244,255,0.3)' },
-  ];
-  const maxStatus = Math.max(...statusDist.map(s => s.val), 1);
-
-  const METRICAS = [
-    { label: 'Estações online',      val: loading ? '...' : `${estacoesOnline}/${estacoes.length}`,   sub: `${taxaDisponib}% disponibilidade`,         cor: '#00E5FF' },
-    { label: 'Em manutenção',        val: loading ? '...' : estacaoManutencao,                         sub: 'Estações indisponíveis',                   cor: '#FF3B5C' },
-    { label: 'Resgatistas online',   val: loading ? '...' : `${resgatistasOnline}/${resgatistas.length}`, sub: `${taxaCobertura}% cobertura`,           cor: '#00FF87' },
-    { label: 'Taxa de resolução SOS',val: loading ? '...' : `${taxaResolucao}%`,                       sub: `${sosConcluidos} de ${resgates.length} resgates`, cor: '#FFB800' },
-    { label: 'Receita total',        val: loading ? '...' : `R$ ${receitaTotal.toFixed(2)}`,           sub: 'Resgates concluídos',                      cor: '#00FF87' },
-    { label: 'Ticket médio SOS',     val: loading ? '...' : `R$ ${ticketMedio.toFixed(2)}`,            sub: 'Por resgate concluído',                    cor: '#00E5FF' },
-  ];
+  const sosPending=resgates.filter(r=>r.status==='pending').length;
+  const sosCompleted=resgates.filter(r=>r.status==='completed').length;
+  const sosAccepted=resgates.filter(r=>r.status==='accepted').length;
+  const driversOnline=resgatistas.filter(r=>r.isAvailable).length;
+  const driversAprovados=resgatistas.filter(r=>r.status==='aprovado').length;
+  const estacoesLivres=estacoes.filter(e=>e.status==='available').length;
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
+    <div style={{display:'flex',minHeight:'100vh',background:'#0A0E1A',color:'#EEF2F7',fontFamily:'sans-serif'}}>
       <Sidebar />
-      <main className="flex-1 ml-60 p-6 overflow-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Analytics</h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--text3)' }}>
-              {loading ? 'Carregando...' : `${estacoes.length} estações · ${resgates.length} resgates · ${resgatistas.length} resgatistas — dados reais`}
-            </p>
-          </div>
-          <button onClick={carregarDados} className="px-4 py-2 rounded-xl text-sm"
-            style={{ backgroundColor: 'var(--s3)', color: 'var(--text2)' }}>↻ Atualizar</button>
+      <main style={{marginLeft:240,flex:1,padding:32,overflowY:'auto'}}>
+        <div style={{marginBottom:28}}>
+          <p style={{fontSize:11,color:'rgba(238,242,247,0.35)',fontFamily:'monospace',letterSpacing:3,marginBottom:6}}>DADOS</p>
+          <h1 style={{fontSize:28,fontWeight:800}}>📊 Analytics — Neon</h1>
         </div>
-
-        {/* KPIs reais */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {METRICAS.map((m, i) => (
-            <div key={i} className="rounded-2xl border p-4" style={{ backgroundColor: 'var(--s2)', borderColor: 'var(--border)' }}>
-              <p className="text-xs uppercase tracking-wider font-mono mb-3" style={{ color: 'var(--text3)' }}>{m.label}</p>
-              <p className="text-3xl font-bold mb-1" style={{ color: m.cor }}>{m.val}</p>
-              <p className="text-xs" style={{ color: 'var(--text3)' }}>{m.sub}</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:28}}>
+          {[['👤','Usuários',usuarios.length,'#A78BFA'],['⚡','Estações',estacoes.length,'#00E5FF'],['🚐','Resgatistas',resgatistas.length,'#FF3B5C'],['🆘','Resgates',resgates.length,'#FFB800']].map(([icon,label,val,cor])=>(
+            <div key={label as string} style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,padding:20}}>
+              <div style={{fontSize:22,marginBottom:8}}>{icon}</div>
+              <div style={{fontSize:32,fontWeight:800,color:cor as string}}>{loading?'...':val as number}</div>
+              <div style={{fontSize:12,color:'rgba(238,242,247,0.4)',marginTop:4}}>{label as string}</div>
             </div>
           ))}
         </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {/* Top estações */}
-          <div className="rounded-2xl border p-4" style={{ backgroundColor: 'var(--s2)', borderColor: 'var(--border)' }}>
-            <h3 className="font-bold text-sm mb-4" style={{ color: 'var(--text)' }}>⚡ Estações — Conectores Livres</h3>
-            {loading ? (
-              <p className="text-center py-4" style={{ color: 'var(--text3)' }}>Carregando...</p>
-            ) : topEstacoes.length === 0 ? (
-              <p className="text-center py-4 text-sm" style={{ color: 'var(--text3)' }}>Sem dados</p>
-            ) : (
-              <div className="space-y-3">
-                {topEstacoes.map((e, i) => (
-                  <div key={e.id} className="flex items-center gap-3">
-                    <span className="text-xs w-4 text-right font-mono" style={{ color: 'var(--text3)' }}>{i+1}</span>
-                    <span className="text-xs flex-1 truncate" style={{ color: 'var(--text2)' }}>{e.nome}</span>
-                    <div className="w-24 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--s3)' }}>
-                      <div className="h-2 rounded-full" style={{ width: `${((e.conectores_livres||0)/maxLivres)*100}%`, backgroundColor: e.status==='online'?'#00FF87':'#FF3B5C' }} />
-                    </div>
-                    <span className="text-xs font-mono w-12 text-right" style={{ color: 'var(--text2)' }}>
-                      {e.conectores_livres}/{e.conectores_total}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Top resgatistas */}
-          <div className="rounded-2xl border p-4" style={{ backgroundColor: 'var(--s2)', borderColor: 'var(--border)' }}>
-            <h3 className="font-bold text-sm mb-4" style={{ color: 'var(--text)' }}>🚐 Top Resgatistas — Avaliação</h3>
-            {loading ? (
-              <p className="text-center py-4" style={{ color: 'var(--text3)' }}>Carregando...</p>
-            ) : topResgatistas.length === 0 ? (
-              <p className="text-center py-4 text-sm" style={{ color: 'var(--text3)' }}>Sem dados</p>
-            ) : (
-              <div className="space-y-3">
-                {topResgatistas.map((r, i) => (
-                  <div key={r.id} className="flex items-center gap-3">
-                    <span className="text-xs w-4 text-right font-mono" style={{ color: 'var(--text3)' }}>{i+1}</span>
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: 'rgba(255,59,92,0.15)', color: '#FF3B5C' }}>
-                      {r.nome?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)}
-                    </div>
-                    <span className="text-xs flex-1 truncate" style={{ color: 'var(--text2)' }}>{r.nome}</span>
-                    <div className="w-20 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--s3)' }}>
-                      <div className="h-2 rounded-full" style={{ width: `${((r.avaliacao||0)/5)*100}%`, backgroundColor: '#FFB800' }} />
-                    </div>
-                    <span className="text-xs font-mono" style={{ color: '#FFB800' }}>{r.avaliacao}★</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Distribuição SOS */}
-        <div className="rounded-2xl border p-4" style={{ backgroundColor: 'var(--s2)', borderColor: 'var(--border)' }}>
-          <h3 className="font-bold text-sm mb-4" style={{ color: 'var(--text)' }}>🆘 Distribuição de Resgates por Status</h3>
-          {loading ? (
-            <p className="text-center py-4" style={{ color: 'var(--text3)' }}>Carregando...</p>
-          ) : (
-            <div className="grid grid-cols-4 gap-4">
-              {statusDist.map((s, i) => (
-                <div key={i} className="text-center">
-                  <div className="text-2xl font-bold mb-1" style={{ color: s.cor }}>{s.val}</div>
-                  <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: 'var(--s3)' }}>
-                    <div className="h-2 rounded-full transition-all" style={{ width: `${(s.val/maxStatus)*100}%`, backgroundColor: s.cor }} />
-                  </div>
-                  <div className="text-xs" style={{ color: 'var(--text3)' }}>{s.label}</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+          <div style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,padding:20}}>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:'#FF3B5C'}}>🆘 Resgates SOS</h3>
+            {[['Pendentes',sosPending,resgates.length,'#FFB800'],['Em andamento',sosAccepted,resgates.length,'#00E5FF'],['Concluídos',sosCompleted,resgates.length,'#00FF87']].map(([l,v,m,c])=>(
+              <div key={l as string} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                  <span style={{color:'rgba(238,242,247,0.6)'}}>{l as string}</span>
+                  <span style={{fontWeight:700,color:c as string}}>{v as number}</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <MetricBar val={v as number} max={m as number} cor={c as string} />
+              </div>
+            ))}
+          </div>
+          <div style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,padding:20}}>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:'#00E5FF'}}>⚡ Estações</h3>
+            {[['Disponíveis',estacoesLivres,estacoes.length,'#00FF87'],['Ocupadas',estacoes.filter(e=>e.status==='occupied').length,estacoes.length,'#FFB800'],['Manutenção',estacoes.filter(e=>e.status==='maintenance').length,estacoes.length,'#FF3B5C']].map(([l,v,m,c])=>(
+              <div key={l as string} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                  <span style={{color:'rgba(238,242,247,0.6)'}}>{l as string}</span>
+                  <span style={{fontWeight:700,color:c as string}}>{v as number}</span>
+                </div>
+                <MetricBar val={v as number} max={m as number} cor={c as string} />
+              </div>
+            ))}
+          </div>
+          <div style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,padding:20}}>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:'#00FF87'}}>🚐 Resgatistas</h3>
+            {[['Online',driversOnline,resgatistas.length,'#00FF87'],['Aprovados',driversAprovados,resgatistas.length,'#00E5FF'],['Pendentes',resgatistas.filter(r=>r.status==='pendente').length,resgatistas.length,'#FFB800']].map(([l,v,m,c])=>(
+              <div key={l as string} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                  <span style={{color:'rgba(238,242,247,0.6)'}}>{l as string}</span>
+                  <span style={{fontWeight:700,color:c as string}}>{v as number}</span>
+                </div>
+                <MetricBar val={v as number} max={m as number} cor={c as string} />
+              </div>
+            ))}
+          </div>
+          <div style={{background:'#111827',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18,padding:20}}>
+            <h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:'#A78BFA'}}>📈 Performance</h3>
+            {[['Taxa conclusão SOS',resgates.length>0?Math.round(sosCompleted/resgates.length*100):0,100,'#00FF87','%'],['Estações disponíveis',estacoes.length>0?Math.round(estacoesLivres/estacoes.length*100):0,100,'#00E5FF','%'],['Resgatistas aprovados',resgatistas.length>0?Math.round(driversAprovados/resgatistas.length*100):0,100,'#A78BFA','%']].map(([l,v,m,c,u])=>(
+              <div key={l as string} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                  <span style={{color:'rgba(238,242,247,0.6)'}}>{l as string}</span>
+                  <span style={{fontWeight:700,color:c as string}}>{v as number}{u}</span>
+                </div>
+                <MetricBar val={v as number} max={m as number} cor={c as string} />
+              </div>
+            ))}
+          </div>
         </div>
       </main>
     </div>
